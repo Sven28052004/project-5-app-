@@ -36,7 +36,7 @@ with st.sidebar:
     dm_file = st.file_uploader("Distance matrix (.xlsx)", type=["xlsx"], key="dm")
     tt_file = st.file_uploader("Timetable (.xlsx)", type=["xlsx"], key="tt")
 
-    st.header("2. Parameter")
+    st.header("2. Parameters")
     battery_capacity = st.number_input("Nameplate battery capacity (kWh)", value=300.0, step=10.0)
     soh_assumed = st.slider("Assumed State of Health (SOH)", 0.80, 1.00, 0.90, 0.01)
     safety_margin = st.slider("Safety margin SOC_min (fraction of usable capacity)", 0.0, 0.30, 0.10, 0.01)
