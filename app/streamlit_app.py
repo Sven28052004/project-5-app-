@@ -24,7 +24,7 @@ from app.visuals import build_gantt, build_soc_chart
 
 st.set_page_config(page_title="E-Bus Planning Checker", layout="wide")
 
-st.title("🚌 E-Bus Planning Checker")
+st.title("E-Bus Planning Checker")
 st.caption("Prototype tool for Transdev / Hermes — bus lines 400 & 401, Eindhoven")
 
 # ----------------------------------------------------------------------------
@@ -74,7 +74,7 @@ dm_source = dm_file
 tt_source = tt_file
 
 if not (bp_source and dm_source and tt_source):
-    st.info("👈 Upload the bus plan, distance matrix, and timetable in the sidebar to begin.")
+    st.info("Upload the bus plan, distance matrix, and timetable in the sidebar to begin.")
     st.stop()
 
 try:
@@ -106,7 +106,7 @@ tab_overview, tab_feasibility, tab_gantt, tab_soc, tab_kpi = st.tabs(
 with tab_overview:
     st.subheader("Feasibility summary")
     col1, col2, col3 = st.columns(3)
-    col1.metric("Overall feasible?", "❌ No" if n_errors > 0 else "✅ Yes")
+    col1.metric("Overall feasible?", "No" if n_errors > 0 else "Yes")
     col2.metric("Feasibility errors", n_errors)
     col3.metric("Warnings", n_warnings)
 
