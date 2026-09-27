@@ -1,16 +1,3 @@
-"""
-Core engine for the E-Bus Planning Checker prototype.
-
-KPIs and feasibility checks implemented here follow exactly the definitions in the
-"KPI and Feasibility Definitions" document (sections 3.2 and 3.3).
-
-Responsibilities:
-- Load & validate input data (timetable, distance matrix, bus plan)
-- Simulate State of Charge (SOC) per bus over the day
-- Check feasibility (9 checks, section 3.3)
-- Compute KPIs (12 KPIs, section 3.2)
-"""
-
 from __future__ import annotations
 
 import pandas as pd
@@ -27,28 +14,29 @@ from typing import Optional
 
 @dataclass
 class Config:
-    battery_capacity_kwh: float = 300.0        # nameplate capacity
-    soh_assumed: float = 0.90                    # assumed State of Health
-    soc_safety_margin: float = 0.10              # SOC_min, fraction of usable capacity
-    soc_max_charge_fraction: float = 0.90        # buses not charged above this in daily ops
-    charge_rate_fast_kw: float = 450.0           # up to 90% SOH
-    charge_rate_slow_kw: float = 60.0            # last 10% (90%-100%)
-    min_charging_minutes: float = 15.0           # c_min
-    idle_power_kw: float = 5.0                   # consumption while stationary
-    depot_location: str = "ehvgar"
+    battery_capacity_kwh: float = 300.0          # Total battery capacity (300kwh)
+    soh_assumed: float = 0.90                    # assumed State of Health in % so how much of the battery kwh you can still use
+    soc_safety_margin: float = 0.10              # Minimum State of Charge in %
+    soc_max_charge_fraction: float = 0.90        # buses not charged above this in daily ops (so 90% of total(300kwh))
+    charge_rate_fast_kw: float = 450.0           # charge rate up to 90% SOH
+    charge_rate_slow_kw: float = 60.0            # charge rate lowers for the last 10% (so from 90% to 100%)
+    min_charging_minutes: float = 15.0           # minimal charging minutes (so 15 minutes)
+    idle_power_kw: float = 5.0                   # consumption while doing nothing
+    depot_location: str = "ehvgar"               # Location of depot
 
     @property
-    def battery_kwh(self) -> float:
-        """SOC_max: usable capacity at the assumed SOH."""
+    def usable_battery_capacity_kwh(self) -> float:
+        """Returns the usable battery capacity after accounting for SOH."""
         return self.battery_capacity_kwh * self.soh_assumed
 
     @property
     def min_soc_kwh(self) -> float:
-        """SOC_min: the safety margin, in kWh."""
-        return self.battery_kwh * self.soc_safety_margin
+        """Calculates the safety margin, in kWh."""
+        return self.usable_battery_capacity_kwh * self.soc_safety_margin
 
     @property
     def max_daily_soc_kwh(self) -> float:
+        """The daily kwh you can charge"""
         return self.battery_kwh * self.soc_max_charge_fraction
 
 
@@ -253,9 +241,9 @@ def check_soc_feasibility(plan_with_soc: pd.DataFrame, config: Config = DEFAULT_
             vr.add("error", "feasibility", "1. SOC below safety margin", row["bus"], idx,
                    f"SOC drops to {row['soc_end_kwh']:.1f} kWh, below the safety margin "
                    f"SOC_min = {config.min_soc_kwh:.1f} kWh ({config.soc_safety_margin:.0%} of usable capacity).")
-        if row["soc_end_kwh"] > config.battery_kwh + 1e-6:
+        if row["soc_end_kwh"] > config.usable_battery_capacity_kwh + 1e-6:
             vr.add("error", "feasibility", "2. SOC exceeding physical battery capacity", row["bus"], idx,
-                   f"SOC exceeds the physical battery capacity SOC_max = {config.battery_kwh:.1f} kWh.")
+                   f"SOC exceeds the physical battery capacity SOC_max = {config.usable_battery_capacity_kwh:.1f} kWh.")
     return vr
 
 
