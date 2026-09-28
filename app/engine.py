@@ -95,29 +95,88 @@ def _parse_time_to_minutes(t) -> float:
         f"Unrecognised time value: {t!r}"
     )
 
+BUS_PLAN_COLUMNS = {                        # Define the columns that must be present in the bus planning file.
+    "start location",
+    "end location",
+    "start time",
+    "end time",
+    "activity",
+    "line",
+    "energy consumption",
+    "bus",
+}
+
 def load_bus_planning(path: str) -> pd.DataFrame:
-    df = pd.read_excel(path)
-    df.columns = [c.strip().lower() for c in df.columns]
-    expected = {"start location", "end location", "start time", "end time",
-                "activity", "line", "energy consumption", "bus"}
-    missing = expected - set(df.columns)
-    if missing:
-        raise ValueError(f"Bus plan is missing expected columns: {missing}")
-    df["start_min"] = df["start time"].apply(_parse_time_to_minutes)
-    df["end_min"] = df["end time"].apply(_parse_time_to_minutes)
-    df["end_min_adj"] = df["end_min"]
-    df.loc[df["end_min"] < df["start_min"], "end_min_adj"] += 24 * 60
-    df["duration_min"] = df["end_min_adj"] - df["start_min"]
-    return df.sort_values(["bus", "start_min"]).reset_index(drop=True)
+    """Load and prepare a bus planning Excel file."""
+
+    df = pd.read_excel(path)                                    # reads the bus plan from the excel file and stores it in a df
+    df.columns = [                                              # Clean all column names: treated as text, removes spaces at beginning and end, converts to lowercase.
+        str(column).strip().lower()
+        for column in df.columns
+    ]
+    missing_columns = BUS_PLAN_COLUMNS - set(df.columns)        # Find which required columns are missing and removes all columns that are present in df.columns so only the missing columns remain.
+    if missing_columns:                                         # Gives an error if there is/are columns missing
+        raise ValueError(
+            "Bus plan is missing expected columns: "
+            f"{sorted(missing_columns)}"
+        )
+    text_columns = [                                            # list of columns that should be cleaned
+        "start location",
+        "end location",
+        "activity",
+    ]
+    for column in text_columns:                                 # Cleans the columns seperatly
+        df[column] = (
+            df[column]
+            .astype("string")                                   # Converts all values to a string
+            .str.strip()                                        # removes spaces at the beginning/end 
+            .str.lower()                                        # Changes uppercase letters to lowercase
+        )
+    df["energy consumption"] = pd.to_numeric(                   # Convert the energy consumption column to numeric values. Error become NaN
+        df["energy consumption"],
+        errors="coerce",
+    )
+    df["bus"] = pd.to_numeric(                                  # Convert the bus column to numeric values. Error become NaN
+        df["bus"],
+        errors="coerce",
+    )
+    df["start_min"] = df["start time"].apply(                   # Convert every start time to the number of minutes since midnight
+        _parse_time_to_minutes
+    )
+    df["end_min"] = df["end time"].apply(                       # Convert every end time to the number of minutes since midnight
+        _parse_time_to_minutes
+    )
+    df["end_min_adj"] = df["end_min"]                           # Create separate adjusted end-time column. Can later be corrected for activities after midnight.
+    overnight_mask = df["end_min"] < df["start_min"]            # find activities where endtime is smaller than starttime (activity goes through midnight)
+    df.loc[overnight_mask, "end_min_adj"] += 24 * 60            # adds 24 hours when endtime goes behond midnight
+    df["duration_min"] = (                                      # calculate the duration of every activity in minutes
+        df["end_min_adj"] - df["start_min"]
+    )
+    return (                                                    # Sort bus plan on bus number and as second sorter starttime
+        df.sort_values(["bus", "start_min"])
+        .reset_index(drop=True)
+    )
 
 
 def load_distance_matrix(path: str) -> pd.DataFrame:
+    """
+    Load the distance matrix from an Excel file.
+     
+    The function also cleans the column names so they can be used
+    consistently throughout the engine.
+    """
     df = pd.read_excel(path)
     df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
     return df
 
 
 def load_timetable(path: str) -> pd.DataFrame:
+    """
+    Load the timetable from an Excel file and prepare the data.
+     
+    The function first cleans the column names. Converts departure times to minutes since midnight.
+    And lastly sorts the timetable by line and departure time.
+    """
     df = pd.read_excel(path)
     df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
     df["departure_min"] = df["departure_time"].apply(_parse_time_to_minutes)
@@ -130,119 +189,120 @@ def load_timetable(path: str) -> pd.DataFrame:
 
 @dataclass
 class Issue:
-    severity: str      # "error" | "warning"
-    category: str       # e.g. "data_quality", "feasibility", "coverage"
-    check: str           # which of the 9 feasibility checks (section 3.3) this belongs to
-    bus: Optional[int]
-    row_index: Optional[int]
-    message: str
+    severity: str                        # error or warning
+    category: str                        # What category for example "data_quality", "feasibility", "coverage"
+    check: str                           # which of the 9 feasibility checks this belongs to
+    bus: Optional[int]                   # which bus gives the issue
+    row_index: Optional[int]             # which row gives the issue
+    message: str                         # contains readable explenation of the issue
 
 
 @dataclass
 class ValidationResult:
-    issues: list = field(default_factory=list)
+    """ Store all errors and warnings found during the validation process. """
+    issues: list = field(default_factory=list)             # create empty list for all issues we find
 
-    def add(self, severity, category, check, bus, row_index, message):
+    def add(self, severity, category, check, bus, row_index, message):         
+        """ Create a new Issue and add it to the list of validation issues. """
         self.issues.append(Issue(severity, category, check, bus, row_index, message))
 
     @property
     def errors(self):
+        """ Return a list containing only validation errors """
         return [i for i in self.issues if i.severity == "error"]
 
     @property
     def warnings(self):
+        """ Return a list containing only validation warnings """
         return [i for i in self.issues if i.severity == "warning"]
 
     @property
     def is_feasible(self):
+        """ Return True if the bus plan contains no validation errors """
         return len(self.errors) == 0
 
     def to_dataframe(self) -> pd.DataFrame:
+        """ Convert all validation issues to a pandas DataFrame """
         return pd.DataFrame([{
             "severity": i.severity, "category": i.category, "check": i.check,
             "bus": i.bus, "row": i.row_index, "message": i.message
         } for i in self.issues])
-
 
 # ----------------------------------------------------------------------------
 # Feasibility checks — section 3.3 of the KPI and Feasibility Definitions document
 # ----------------------------------------------------------------------------
 
 def check_data_quality(plan: pd.DataFrame, valid_locations: set) -> ValidationResult:
-    """Checks 4, 5, 6, 9 from section 3.3 (time/logic and data quality)."""
-    vr = ValidationResult()
-    cfg = DEFAULT_CONFIG
-    for idx, row in plan.iterrows():
-        # Check 9: missing or invalid data
-        if pd.isna(row["start_min"]) or pd.isna(row["end_min"]):
-            vr.add("error", "data_quality", "9. Missing or invalid data", row["bus"], idx,
+    """Checks the time logic and data quality of the bus plan."""
+    vr = ValidationResult()                       # create an empty validationresult object where all errors and warning can be stored
+    cfg = DEFAULT_CONFIG                          # Load the default configuration settings.
+    for idx, row in plan.iterrows():                                                             # go through every activity in the bus plan
+        if pd.isna(row["start_min"]) or pd.isna(row["end_min"]):                                 # check if start or end time are missing
+            vr.add("error", "data_quality", "9. Missing or invalid data", row["bus"], idx,          # add an error indicating that activity has missing data
                    "Missing start or end time.")
-            continue
-        if row["duration_min"] < 0:
+            continue                                    # skip remaining checks in this row because it can't be checked
+        if row["duration_min"] < 0:                 # Checks if duration is negative which means it ends before it starts (even after correcting midnight)
             vr.add("error", "data_quality", "9. Missing or invalid data", row["bus"], idx,
                    f"Negative duration ({row['duration_min']:.1f} min) after rollover correction.")
-        if row["start location"] not in valid_locations:
+        if row["start location"] not in valid_locations:            # Checks if the start location is in a known location
             vr.add("error", "data_quality", "9. Missing or invalid data", row["bus"], idx,
                    f"Unknown start location '{row['start location']}'.")
-        if row["end location"] not in valid_locations:
+        if row["end location"] not in valid_locations:                # Checks if the end location is in a known location
             vr.add("error", "data_quality", "9. Missing or invalid data", row["bus"], idx,
                    f"Unknown end location '{row['end location']}'.")
-        if row["activity"] not in {"service trip", "material trip", "idle", "charging"}:
+        if row["activity"] not in {"service trip", "material trip", "idle", "charging"}:        # Checks if activity is a known activity
             vr.add("error", "data_quality", "9. Missing or invalid data", row["bus"], idx,
                    f"Unknown activity type '{row['activity']}'.")
-        if row["activity"] == "service trip" and pd.isna(row["line"]):
+        if row["activity"] == "service trip" and pd.isna(row["line"]):                    # Geeft een warning als er een service trip is zonder line nummer
             vr.add("warning", "data_quality", "9. Missing or invalid data", row["bus"], idx,
                    "Service trip has no line number.")
-        # Check 3: charging session below minimum duration (c_bi < c_min)
-        if row["activity"] == "charging" and row["duration_min"] < cfg.min_charging_minutes:
+        if row["activity"] == "charging" and row["duration_min"] < cfg.min_charging_minutes:       # controleert of de charging duration van een activity 'charging' niet onder de minimale charging duration ligt
             vr.add("error", "feasibility", "3. Charging session below minimum duration",
                    row["bus"], idx,
                    f"Charging session is only {row['duration_min']:.0f} min "
                    f"(c_min = {cfg.min_charging_minutes:.0f} min).")
 
-    # Check 4: overlapping activities (a bus cannot be in two places at once)
-    # Check 5: location mismatch (a bus cannot depart from a location it has not arrived at)
-    for bus, grp in plan.groupby("bus"):
-        grp = grp.sort_values("start_min").reset_index()
-        for i in range(len(grp) - 1):
-            cur, nxt = grp.iloc[i], grp.iloc[i + 1]
-            if cur["end location"] != nxt["start location"]:
+    for bus, grp in plan.groupby("bus"):                    # Group the activities by bus so that every bus is checked separately
+        grp = grp.sort_values("start_min").reset_index()                # Sort the activities of the bus by their start time
+        for i in range(len(grp) - 1):                            # Compare every activity with the one after it
+            cur, nxt = grp.iloc[i], grp.iloc[i + 1]                    # select the current activity and the next activity
+            if cur["end location"] != nxt["start location"]:               #  Checks if the end location of the current activity is the start location of the next activity
                 vr.add("error", "data_quality",
                        "5. Location mismatch (a bus cannot depart from a location it has not arrived at)",
                        bus, nxt["index"],
                        f"Location mismatch: bus {bus} ends route at '{cur['end location']}' "
                        f"but next route starts at '{nxt['start location']}'.")
-            if nxt["start_min"] < cur["end_min_adj"] - 1e-6:
+            if nxt["start_min"] < cur["end_min_adj"] - 1e-6:               # Checks if the end time of the current activity is bigger as the start time of the next activity
                 vr.add("error", "data_quality",
                        "4. Overlapping activities (a bus cannot be in two places at once)",
                        bus, nxt["index"],
                        f"Overlapping activities for bus {bus}: route starting at "
                        f"{nxt['start time']} begins before previous route ends.")
-    return vr
+    return vr               # returns the Validationresult containing all errors and warnings
 
 
 def check_travel_time(plan: pd.DataFrame, dmatrix: pd.DataFrame) -> ValidationResult:
-    """Check 6: travel time shorter than minimum required (tau_br < tau_min_br)."""
-    vr = ValidationResult()
-    for idx, row in plan.iterrows():
-        if row["activity"] not in {"service trip", "material trip"}:
+    """Checks if travel time is shorter than minimum required (tau_br < tau_min_br)."""
+    vr = ValidationResult()                     # create an empty validationresult object where all errors and warning can be stored
+    for idx, row in plan.iterrows():                        # go through every line in the bus plan
+        if row["activity"] not in {"service trip", "material trip"}:          # Checks if the bus is traveling to another location if not skip this part
             continue
-        if row["start location"] == row["end location"]:
+        if row["start location"] == row["end location"]:                      # Checks if the bus is traveling to another location if not skip this part
             continue
-        subset = dmatrix[(dmatrix["start"] == row["start location"]) &
+        subset = dmatrix[(dmatrix["start"] == row["start location"]) &                        # Search the distance matrix for rows that match both: The start and end location of the activity.
                           (dmatrix["end"] == row["end location"])]
-        if row.get("line") is not None and not pd.isna(row.get("line")) and (subset["line"] == row["line"]).any():
-            subset = subset[subset["line"] == row["line"]]
-        if subset.empty:
-            continue  # already flagged by check_data_quality as unknown location
-        min_travel_time = float(subset.iloc[0]["min_travel_time"])
-        if row["duration_min"] < min_travel_time - 1e-6:
+        if row.get("line") is not None and not pd.isna(row.get("line")) and (subset["line"] == row["line"]).any():    # Check if the activity has a line number and if this line number can be found in the distance matrix
+            subset = subset[subset["line"] == row["line"]]            # Only keep the distance matrix row for the correct line
+        if subset.empty:            # Checks if the distance matrix contains no matching routes
+            continue              # already flagged by check_data_quality as unknown location
+        min_travel_time = float(subset.iloc[0]["min_travel_time"])                    # Select minimum required travel time
+        if row["duration_min"] < min_travel_time - 1e-6:                # Checks if minimum duration is smaller as the minimum required travel time and gives an error if this is the case
             vr.add("error", "feasibility", "6. Travel time shorter than minimum required",
                    row["bus"], idx,
                    f"Scheduled travel time is {row['duration_min']:.1f} min, "
                    f"below the minimum required {min_travel_time:.1f} min "
                    f"({row['start location']} \u2192 {row['end location']}).")
-    return vr
+    return vr               # returns the Validationresult containing all errors and warnings
 
 
 def simulate_soc(plan: pd.DataFrame, config: Config = DEFAULT_CONFIG) -> pd.DataFrame:
