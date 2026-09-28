@@ -306,22 +306,29 @@ def check_travel_time(plan: pd.DataFrame, dmatrix: pd.DataFrame) -> ValidationRe
 
 
 def simulate_soc(plan: pd.DataFrame, config: Config = DEFAULT_CONFIG) -> pd.DataFrame:
-    """Simulates SOC_br for each bus b and route r, in chronological order.
-    Energy consumption is signed: positive = discharge, negative = charge."""
-    plan = plan.copy()
-    plan["soc_start_kwh"] = np.nan
-    plan["soc_end_kwh"] = np.nan
+    """
+    Simulate the battery SOC for every bus.
 
-    for bus, idx in plan.groupby("bus").groups.items():
-        idx = sorted(idx, key=lambda i: plan.loc[i, "start_min"])
-        soc = config.max_daily_soc_kwh
-        for i in idx:
-            plan.at[i, "soc_start_kwh"] = soc
-            delta = plan.at[i, "energy consumption"]
-            soc = soc - delta
-            soc = min(soc, config.battery_kwh)
-            plan.at[i, "soc_end_kwh"] = soc
-    return plan
+    Positive energy consumption lowers the SOC.
+    Negative energy consumption increases the SOC.
+    """
+    plan = plan.copy()            # make a copy of the database this prevents the original from being changed
+    plan["soc_start_kwh"] = np.nan            # Create a new column for the SOC at the start of each activity
+    plan["soc_end_kwh"] = np.nan              # Create a new column for the SOC at the end of each activity, they will both be empty because we haven't calculated the SOC yet
+    bus_groups = plan.groupby("bus").groups             # Groups de row index by bus numbers
+    for bus, indexes in bus_groups.items():                # Go through every bus and the indexes of its activities
+        sorted_indexes = sorted(indexes, key=lambda index: plan.loc[index, "start_min"],)            # sort the activity indexes by their starting time 
+        soc = config.max_daily_soc_kwh                # assuming that every bus starts with the maximum SOC
+        for index in sorted_indexes:                # go through all the activities of the current bus
+            plan.at[index, "soc_start_kwh"] = soc                # store the current SOC as the SOC at the start of the activity 
+            energy = plan.at[index, "energy consumption"]            # get the energy consumption of the current activity
+            if pd.isna(energy):       # check whether the energy consumption is missing if so the end SOC can't be calculated so skip the rest of this activity
+                plan.at[index, "soc_end_kwh"] = np.nan
+                continue
+            soc = soc - float(energy)            # calculate the new SOC after the activity
+            plan.at[index, "soc_end_kwh"] = soc                # store the calculated SOC as the new SOC at the end of the activity
+    return plan                # Return the bus plan with the calculated SOC columns
+
 
 
 def check_soc_feasibility(plan_with_soc: pd.DataFrame, config: Config = DEFAULT_CONFIG) -> ValidationResult:
@@ -337,7 +344,37 @@ def check_soc_feasibility(plan_with_soc: pd.DataFrame, config: Config = DEFAULT_
             vr.add("error", "feasibility", "2. SOC exceeding physical battery capacity", row["bus"], idx,
                    f"SOC exceeds the physical battery capacity SOC_max = {config.usable_battery_capacity_kwh:.1f} kWh.")
     return vr
-
+    
+def check_soc_feasibility(plan_with_soc: pd.DataFrame, config: Config = DEFAULT_CONFIG,) -> ValidationResult:
+    """
+    Check whether the SOC stays within the battery limits.
+    Checks if SOC is below the safety margin and if SOC is above the usable battery capacity.
+    """
+    vr = ValidationResult()                 # create an empty validationresult object where all errors and warning can be stored
+    for idx, row in plan_with_soc.iterrows():            # go through every row in the bus plan with calculated SOC
+        if pd.isna(row["soc_end_kwh"]):                # Checks if the SOC at the end of the trip is missing
+            vr.add("error", "data_quality", "9. Missing or invalid data", row["bus"], idx,               # adds a data quality because SOC could not be calculated for this activity
+                "SOC could not be calculated because "
+                "energy data is missing.",
+            )
+            continue                # Skip the remaining SOC checks for this row
+        if row["soc_end_kwh"] < config.min_soc_kwh - 1e-6:                    # Checks if the SOC at the end of a activity is below the minimum SOC
+            vr.add("error", "feasibility", "1. SOC below safety margin", row["bus"], idx,
+                (
+                    f"SOC drops to {row['soc_end_kwh']:.1f} kWh, "
+                    f"below the safety margin of "
+                    f"{config.min_soc_kwh:.1f} kWh."
+                ),
+            )
+        if (row["soc_end_kwh"] > config.usable_battery_capacity_kwh + 1e-6):            # Checks that the SOC at the end of a trip is bigger as the SOH and if so gives an error as output
+            vr.add("error", "feasibility", "2. SOC exceeding physical battery capacity", row["bus"], idx,
+                (
+                    f"SOC increases to {row['soc_end_kwh']:.1f} kWh, "
+                    f"above the usable battery capacity of "
+                    f"{config.usable_battery_capacity_kwh:.1f} kWh."
+                ),
+            )
+    return vr               # returns the Validationresult containing all errors and warnings
 
 def check_timetable_coverage(plan: pd.DataFrame, timetable: pd.DataFrame,
                               tolerance_min: float = 1.0) -> ValidationResult:
