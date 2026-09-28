@@ -361,119 +361,149 @@ def check_soc_feasibility(plan_with_soc: pd.DataFrame, config: Config = DEFAULT_
             )
     return vr               # returns the Validationresult containing all errors and warnings
 
-def check_timetable_coverage(plan: pd.DataFrame, timetable: pd.DataFrame,
-                              tolerance_min: float = 1.0) -> ValidationResult:
-    """Check 7: timetable trip not covered by the plan (T \\ P != empty).
-    Check 8: unmatched service trip, extra trip not in the timetable (P \\ T != empty)."""
-    vr = ValidationResult()
-    service = plan[plan["activity"] == "service trip"].copy()
-    matched = set()
-    for tidx, trow in timetable.iterrows():
-        candidates = service[
-            (service["line"] == trow["line"]) &
-            (service["start location"] == trow["start"]) &
-            (service["end location"] == trow["end"]) &
-            (service["start_min"].sub(trow["departure_min"]).abs() <= tolerance_min)
+
+def check_timetable_coverage(plan: pd.DataFrame, timetable: pd.DataFrame, tolerance_min: float = 1.0,) -> ValidationResult:
+    """ Check that timetable trips and service trips match one-to-one. """
+    vr = ValidationResult()                 # create an empty validationresult object where all errors and warning can be stored
+    service = plan[plan["activity"] == "service trip"].copy()        # Only get the service trips from the complete bus plan
+    matched_service_trips = set()            # Create an empty set to store the indexes of service trips that have already been matched to a timetable trip
+    for timetable_index, timetable_row in timetable.iterrows():            # Go through every trip in the timetable
+        candidates = service[                                            # Find all service trips that could match the current timetable trip it matches when: line number is the same, start and end locations are the same and The difference between start time and timetabledeparture time is within allowed tolerance
+            (service["line"] == timetable_row["line"])
+            & (service["start location"] == timetable_row["start"])
+            & (service["end location"] == timetable_row["end"])
+            & (service["start_min"].sub(timetable_row["departure_min"]).abs() <= tolerance_min)
         ]
-        if candidates.empty:
-            vr.add("error", "coverage", "7. Timetable trip not covered by the plan", None, tidx,
-                   f"Timetable trip line {trow['line']} {trow['start']}->{trow['end']} "
-                   f"at {trow['departure_time']} is not covered by any bus in the plan.")
-        else:
-            matched.add(candidates.index[0])
-    unmatched_service = set(service.index) - matched
-    for i in unmatched_service:
-        vr.add("error", "coverage", "8. Unmatched service trip (extra trip not in the timetable)",
-               plan.loc[i, "bus"], i,
-               "Service trip in bus plan does not match any timetable entry "
-               "(check line/location/time).")
-    return vr
+        candidates = candidates[~candidates.index.isin(matched_service_trips)]        # Remove service trips that have already been matched to another timetable trip
+
+        if candidates.empty:                                # check if no matching service trip is found and give an error if there is non found
+            vr.add("error", "coverage", "7. Timetable trip not covered by the plan", None,
+                timetable_index,
+                (
+                    f"Timetable trip on line "
+                    f"{timetable_row['line']} from "
+                    f"{timetable_row['start']} to "
+                    f"{timetable_row['end']} at "
+                    f"{timetable_row['departure_time']} "
+                    f"is not covered by any bus."
+                ),
+            )
+        else:                        # calculate the value between every candidates start time and the timetable departure time
+            time_difference = (
+                candidates["start_min"]
+                .sub(timetable_row["departure_min"])
+                .abs()
+            )
+            best_match_index = time_difference.idxmin()                # Find the index of the candidate that has the smallest ifference from the timetable departure time.
+            matched_service_trips.add(best_match_index)                # mark the selected service trips as matched so it can't be used again
+    unmatched_service_trips = (set(service.index) - matched_service_trips)            # Find all service trips that were not matched to a timetable trip
+    for index in unmatched_service_trips:                # Go through every unmatched service trip and add an error because the trip exists in the bus plan but not in the timetable
+        vr.add("error", "coverage", "8. Unmatched service trip", plan.loc[index, "bus"], index,
+            (
+                "Service trip in the bus plan does not match "
+                "any timetable entry. Check the line, "
+                "locations and departure time."
+            ),
+        )
+    return vr               # returns the Validationresult containing all errors and warnings
 
 
-def run_all_feasibility_checks(plan_with_soc: pd.DataFrame, dmatrix: pd.DataFrame,
-                                timetable: pd.DataFrame, valid_locations: set,
-                                config: Config = DEFAULT_CONFIG) -> ValidationResult:
-    """Runs all 9 feasibility checks from section 3.3 and combines the results."""
-    dq = check_data_quality(plan_with_soc, valid_locations)
-    tt = check_travel_time(plan_with_soc, dmatrix)
-    soc = check_soc_feasibility(plan_with_soc, config)
-    cov = check_timetable_coverage(plan_with_soc, timetable)
-    return ValidationResult(issues=dq.issues + tt.issues + soc.issues + cov.issues)
+def run_all_feasibility_checks(plan_with_soc: pd.DataFrame, dmatrix: pd.DataFrame, timetable: pd.DataFrame,
+                               valid_locations: set, config: Config = DEFAULT_CONFIG,) -> ValidationResult:
+    """
+    Run all feasibility checks and combine their issues
+    into one ValidationResult object.
+    """
+    data_quality_result = check_data_quality(plan_with_soc, valid_locations,)                # Check the bus plan for missing, invalid or conflicting data.
+    travel_time_result = check_travel_time(plan_with_soc, dmatrix,)                # Check if every service and material trip has enough time to travel between locations
+    soc_result = check_soc_feasibility(plan_with_soc, config,)            # Checks if the battery SOC stays between minimum and maximum allowed battery levels
+    coverage_result = check_timetable_coverage(plan_with_soc, timetable,)                # Check if the service trips in the bus plan exactly matches the required trips in the timetable 
+    all_issues = (data_quality_result.issues + travel_time_result.issues + soc_result.issues + coverage_result.issues)         # Combine the issues from all four results into one list
+    return ValidationResult(issues=all_issues)                # Create and return one Validationresult containing all errors and warnings found by the checks above
 
 
 # ----------------------------------------------------------------------------
 # KPI computation — section 3.2 of the KPI and Feasibility Definitions document
 # ----------------------------------------------------------------------------
 
-def compute_kpis(plan_with_soc: pd.DataFrame, config: Config = DEFAULT_CONFIG) -> dict:
-    """Computes all 12 KPIs from section 3.2, in the same order and ranking."""
-    B = plan_with_soc["bus"].unique()
-    n_buses = len(B)  # KPI 1: |B|
+def compute_kpis(plan_with_soc: pd.DataFrame, config: Config = DEFAULT_CONFIG,) -> dict:
+    """Compute the 12 defined KPIs."""
+    buses = plan_with_soc["bus"].dropna().unique()                # Select all unique busses used in the full bus plan
+    number_of_buses = len(buses)                                  # Count all unique busses used in the full bus plan
+    
+    service = plan_with_soc[plan_with_soc["activity"] == "service trip"]        # Select all service trips from the full bus plan
+    material = plan_with_soc[plan_with_soc["activity"] == "material trip"]      # Select all material trips from the full bus plan
+    charging = plan_with_soc[plan_with_soc["activity"] == "charging"]           # Select all charging activities from the full bus plan
+    idle = plan_with_soc[plan_with_soc["activity"] == "idle"]                   # Select all idle activities from the full bus plan
 
-    service = plan_with_soc[plan_with_soc["activity"] == "service trip"]      # S
-    material = plan_with_soc[plan_with_soc["activity"] == "material trip"]     # M
-    charging = plan_with_soc[plan_with_soc["activity"] == "charging"]          # C
-    idle = plan_with_soc[plan_with_soc["activity"] == "idle"]
+    number_of_service_trips = len(service)                # Count all service trips from the full bus plan
+    number_of_material_trips = len(material)              # Count all material trips from the full bus plan
+    number_of_charging_sessions = len(charging)           # Count all charging activities from the full bus plan
 
-    n_service_trips = len(service)      # KPI 2: |S|
-    n_material_trips = len(material)    # KPI 5: |M|
-    n_charging_sessions = len(charging)  # KPI 6: |C|
+    total_service_minutes = service["duration_min"].sum()            # Calculate the full duration of all service trips in minutes
+    total_material_minutes = material["duration_min"].sum()          # Calculate the full duration of all material trips in minutes
+    total_charging_minutes = charging["duration_min"].sum()          # Calculate the full duration of all charging activities in minutes
+    total_idle_minutes = idle["duration_min"].sum()                  # Calculate the full duration of all idle activities in minutes
 
-    total_service_min = service["duration_min"].sum()    # KPI 7
-    total_material_min = material["duration_min"].sum()  # KPI 8
-    total_charging_min = charging["duration_min"].sum()   # KPI 9
-    total_idle_min = idle["duration_min"].sum()            # KPI 10
-    total_min = plan_with_soc["duration_min"].sum()
+    total_minutes = plan_with_soc["duration_min"].sum()              # Calculate the full duration of all activities thogether in minutes
 
-    # KPI 3: deadhead ratio
-    deadhead_ratio = total_material_min / total_service_min if total_service_min else np.nan
-    # KPI 4: productive time ratio
-    productive_time_ratio = total_service_min / total_min if total_min else np.nan
+    if total_service_minutes > 0:                                    # compares the time spent on service trips with the time spend on material trips
+        deadhead_ratio = (total_material_minutes / total_service_minutes)
+    else:                            # If there weren't any service trips we cannot calculate the deadhead ratio because dividing with 0 is not possible
+        deadhead_ratio = np.nan
 
-    # KPI 11: lowest SOC reached = min_{b,r} SOC_br
-    min_soc_overall = plan_with_soc["soc_end_kwh"].min()
+    if total_minutes > 0:                                            # Calculates the productive time ratio which compares the service time with the time of all other activities
+        productive_time_ratio = (total_service_minutes / total_minutes)
+    else:                           # If there weren't any minutes made we cannot calculate the productive time ratio because dividing with 0 is not possible
+        productive_time_ratio = np.nan
 
-    # KPI 12: number of buses breaching the safety margin
-    min_soc_per_bus = plan_with_soc.groupby("bus")["soc_end_kwh"].min()
-    buses_below_margin = int((min_soc_per_bus < config.min_soc_kwh).sum())
+    minimum_soc_overall = (plan_with_soc["soc_end_kwh"].min())                    # Find the lowest end SOC reached by any bus during any activity in the complete bus plan
 
-    return {
-        "n_buses": n_buses,                              # 1
-        "n_service_trips": n_service_trips,               # 2
-        "deadhead_ratio": deadhead_ratio,                  # 3
-        "productive_time_ratio": productive_time_ratio,    # 4
-        "n_material_trips": n_material_trips,               # 5
-        "n_charging_sessions": n_charging_sessions,          # 6
-        "total_service_hours": total_service_min / 60,        # 7
-        "total_material_hours": total_material_min / 60,       # 8
-        "total_charging_hours": total_charging_min / 60,        # 9
-        "total_idle_hours": total_idle_min / 60,                  # 10
-        "min_soc_kwh_overall": min_soc_overall,                    # 11
-        "buses_below_margin": buses_below_margin,                   # 12
+    minimum_soc_per_bus = (plan_with_soc.groupby("bus")["soc_end_kwh"].min())           # Find the lowest end SOC reached by each individual bus
+    buses_below_margin = int((minimum_soc_per_bus < config.min_soc_kwh).sum())          # Count how many buses drop below the  SOC safety margin
+
+    return {                                        # Return all 12 KPI's in a dictionary
+        "n_buses": number_of_buses,
+        "n_service_trips": number_of_service_trips,
+        "deadhead_ratio": deadhead_ratio,
+        "productive_time_ratio": productive_time_ratio,
+        "n_material_trips": number_of_material_trips,
+        "n_charging_sessions": number_of_charging_sessions,
+        "total_service_hours": total_service_minutes / 60,
+        "total_material_hours": total_material_minutes / 60,
+        "total_charging_hours": total_charging_minutes / 60,
+        "total_idle_hours": total_idle_minutes / 60,
+        "min_soc_kwh_overall": minimum_soc_overall,
+        "buses_below_margin": buses_below_margin,
     }
-
-
+    
 # ----------------------------------------------------------------------------
 # Full pipeline
 # ----------------------------------------------------------------------------
 
-def run_full_check(bus_planning_path: str, distance_matrix_path: str, timetable_path: str,
-                    config: Config = DEFAULT_CONFIG):
-    plan = load_bus_planning(bus_planning_path)
-    dmatrix = load_distance_matrix(distance_matrix_path)
-    timetable = load_timetable(timetable_path)
+def run_full_check(bus_planning_path: str, distance_matrix_path: str, timetable_path: str, config: Config = DEFAULT_CONFIG,) -> dict:
+    """ Run the complete bus plan validation and KPI calculation process. """
+    plan = load_bus_planning(bus_planning_path)                    # Load and prepare the bus planning Excel file.
+    dmatrix = load_distance_matrix(distance_matrix_path)           # Load and prepare the distance matrix.
+    timetable = load_timetable(timetable_path)                     # Load and prepare the timetable.
+    
+    valid_locations = (set(dmatrix["start"]) | set(dmatrix["end"]) | {config.depot_location})                # Create a set containing all valid locations.
+    
+    plan_with_soc = simulate_soc(plan, config,)                    # Simulate the battery State of Charge for every bus.
+    validation_result = run_all_feasibility_checks(                # Run all data quality, travel time, SOC and timetable coverage checks
+        plan_with_soc,
+        dmatrix,
+        timetable,
+        valid_locations,
+        config,
+    )
+    kpis = compute_kpis(plan_with_soc, config,)                    # Calculate all 12 KPIs using the bus plan
 
-    valid_locations = set(dmatrix["start"]) | set(dmatrix["end"]) | {config.depot_location}
-
-    plan_soc = simulate_soc(plan, config)
-    all_issues = run_all_feasibility_checks(plan_soc, dmatrix, timetable, valid_locations, config)
-    kpis = compute_kpis(plan_soc, config)
-
-    return {
-        "plan": plan_soc,
+    return {                                                       # Return all loaded data and calculated result in one dictionary.
+        "plan": plan_with_soc,
         "distance_matrix": dmatrix,
         "timetable": timetable,
-        "validation": all_issues,
+        "validation": validation_result,
         "kpis": kpis,
         "config": config,
     }
