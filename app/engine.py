@@ -48,20 +48,52 @@ DEFAULT_CONFIG = Config()
 # ----------------------------------------------------------------------------
 
 def _parse_time_to_minutes(t) -> float:
-    """Parse a time-like value (str 'HH:MM[:SS]', datetime.time, Timestamp) to minutes since 00:00."""
+    """
+    Convert a time value to the number of minutes since midnight.
+
+    Accepted formats:
+    - String: HH:MM or HH:MM:SS
+    - datetime.time
+    - datetime
+    - pandas.Timestamp
+    """
     if pd.isna(t):
         return np.nan
     if isinstance(t, str):
-        parts = t.split(":")
-        h, m = int(parts[0]), int(parts[1])
-        s = int(parts[2]) if len(parts) > 2 else 0
-        return h * 60 + m + s / 60
-    if isinstance(t, time):
-        return t.hour * 60 + t.minute + t.second / 60
-    if isinstance(t, pd.Timestamp) or isinstance(t, datetime):
-        return t.hour * 60 + t.minute + t.second / 60
-    raise ValueError(f"Unrecognised time value: {t!r}")
-
+        try:
+            parts = t.strip().split(":")                                # remove spaces
+            if len(parts) not in {2, 3}:                                # Time must contain hours an minutes, seconds are optional
+                raise ValueError
+            hours = int(parts[0])                                       # turns time into integer
+            minutes = int(parts[1])
+            seconds = int(parts[2]) if len(parts) == 3 else 0
+            if not 0 <= hours <= 23:                                    # Checks if the amount of hours/minutes/seconds is possible in normal time
+                raise ValueError
+            if not 0 <= minutes <= 59:
+                raise ValueError
+            if not 0 <= seconds <= 59:
+                raise ValueError
+            return hours * 60 + minutes + seconds / 60                  # converts time into minutes
+        except ValueError:                                              # Gives error if time is not valid
+            raise ValueError(
+                f"Invalid time value: {t!r}. "
+                "Expected HH:MM or HH:MM:SS."
+            )
+    if isinstance(t, time):                # Checks whether the value contains a time, but no date.
+        return (                           # Convert the time in minutes
+            t.hour * 60
+            + t.minute
+            + t.second / 60
+        )
+    if isinstance(t, (pd.Timestamp, datetime)):      # Check whether the value contain both a date and a time. 
+        return (                                     # ignore the date and convert the time in minutes
+            t.hour * 60
+            + t.minute
+            + t.second / 60
+        )
+    raise ValueError(                                # raise an error if the data is not a accepted data type
+        f"Unrecognised time value: {t!r}"
+    )
 
 def load_bus_planning(path: str) -> pd.DataFrame:
     df = pd.read_excel(path)
