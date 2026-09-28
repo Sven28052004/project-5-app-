@@ -26,9 +26,9 @@ class Config:
 
     @property
     def battery_kwh(self) -> float:
-    """Alias for usable_battery_capacity_kwh, kept so older code that
-    still refers to battery_kwh keeps working."""
-    return self.usable_battery_capacity_kwh
+        """Alias for usable_battery_capacity_kwh, kept so older code that
+        still refers to battery_kwh keeps working."""
+        return self.usable_battery_capacity_kwh
     
     @property
     def usable_battery_capacity_kwh(self) -> float:
