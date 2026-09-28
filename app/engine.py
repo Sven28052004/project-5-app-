@@ -80,20 +80,10 @@ def _parse_time_to_minutes(t) -> float:
                 "Expected HH:MM or HH:MM:SS."
             )
     if isinstance(t, time):                # Checks whether the value contains a time, but no date.
-        return (                           # Convert the time in minutes
-            t.hour * 60
-            + t.minute
-            + t.second / 60
-        )
+        return (t.hour * 60 + t.minute + t.second / 60)                   # Convert the time in minutes
     if isinstance(t, (pd.Timestamp, datetime)):      # Check whether the value contain both a date and a time. 
-        return (                                     # ignore the date and convert the time in minutes
-            t.hour * 60
-            + t.minute
-            + t.second / 60
-        )
-    raise ValueError(                                # raise an error if the data is not a accepted data type
-        f"Unrecognised time value: {t!r}"
-    )
+        return (t.hour * 60 + t.minute + t.second / 60)                   # ignore the date and convert the time in minutes
+    raise ValueError(f"Unrecognised time value: {t!r}")                   # raise an error if the data is not a accepted data type
 
 BUS_PLAN_COLUMNS = {                        # Define the columns that must be present in the bus planning file.
     "start location",
