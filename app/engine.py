@@ -329,21 +329,6 @@ def simulate_soc(plan: pd.DataFrame, config: Config = DEFAULT_CONFIG) -> pd.Data
             plan.at[index, "soc_end_kwh"] = soc                # store the calculated SOC as the new SOC at the end of the activity
     return plan                # Return the bus plan with the calculated SOC columns
 
-
-
-def check_soc_feasibility(plan_with_soc: pd.DataFrame, config: Config = DEFAULT_CONFIG) -> ValidationResult:
-    """Check 1: SOC below safety margin (SOC_br < SOC_min).
-    Check 2: SOC exceeding physical battery capacity (SOC_br > SOC_max)."""
-    vr = ValidationResult()
-    for idx, row in plan_with_soc.iterrows():
-        if row["soc_end_kwh"] < config.min_soc_kwh - 1e-6:
-            vr.add("error", "feasibility", "1. SOC below safety margin", row["bus"], idx,
-                   f"SOC drops to {row['soc_end_kwh']:.1f} kWh, below the safety margin "
-                   f"SOC_min = {config.min_soc_kwh:.1f} kWh ({config.soc_safety_margin:.0%} of usable capacity).")
-        if row["soc_end_kwh"] > config.usable_battery_capacity_kwh + 1e-6:
-            vr.add("error", "feasibility", "2. SOC exceeding physical battery capacity", row["bus"], idx,
-                   f"SOC exceeds the physical battery capacity SOC_max = {config.usable_battery_capacity_kwh:.1f} kWh.")
-    return vr
     
 def check_soc_feasibility(plan_with_soc: pd.DataFrame, config: Config = DEFAULT_CONFIG,) -> ValidationResult:
     """
