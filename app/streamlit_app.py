@@ -15,7 +15,6 @@ from app.visuals import build_gantt, build_soc_chart
 st.set_page_config(page_title="E-Bus Planning Checker", layout="wide")
 
 st.title("E-Bus Planning Checker")
-st.caption("Prototype tool for Transdev / Hermes — bus lines 400 & 401, Eindhoven")
 
 # ----------------------------------------------------------------------------
 # Sidebar: inputs and assumptions
