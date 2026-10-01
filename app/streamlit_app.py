@@ -176,13 +176,13 @@ with tab_kpi:
 
     st.markdown("**Less importend KPI's**")
     c7, c8, c9 = st.columns(3)
-    c7.metric("7. Number of service trips", kpis["n_service_trips"])
-    c8.metric("8. Number of material trips", kpis["n_material_trips"])
-    c9.metric("9. Number of charging sessions", kpis["n_charging_sessions"])
+    kleine_kpi(c7, "7. Number of service trips", kpis["n_service_trips"])
+    kleine_kpi(c8, "8. Number of material trips", kpis["n_material_trips"])
+    kleine_kpi(c9, "9. Number of charging sessions", kpis["n_charging_sessions"])
     c10, c11, c12 = st.columns(3)
-    c10.metric("10. Total material hours", f"{kpis['total_material_hours']:.1f} h")
-    c11.metric("11. Total charging hours", f"{kpis['total_charging_hours']:.1f} h")
-    c12.metric("12. Lowest SOC reached", f"{kpis['min_soc_kwh_overall']:.1f} kWh")
+    kleine_kpi(c10, "10. Total material hours", f"{kpis['total_material_hours']:.1f} h")
+    kleine_kpi(c11, "11. Total charging hours", f"{kpis['total_charging_hours']:.1f} h")
+    kleine_kpi(c12, "12. Lowest SOC reached", f"{kpis['min_soc_kwh_overall']:.1f} kWh")
     
     st.markdown("**KPI definitions**")
     st.markdown(
