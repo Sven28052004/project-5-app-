@@ -225,7 +225,7 @@ class ValidationResult:
         } for i in self.issues])
 
 # ----------------------------------------------------------------------------
-# Feasibility checks — section 3.3 of the KPI and Feasibility Definitions document
+# Feasibility checks - section 3.3 of the KPI and Feasibility Definitions document
 # ----------------------------------------------------------------------------
 
 def check_data_quality(plan: pd.DataFrame, valid_locations: set) -> ValidationResult:
@@ -419,7 +419,7 @@ def run_all_feasibility_checks(plan_with_soc: pd.DataFrame, dmatrix: pd.DataFram
 
 
 # ----------------------------------------------------------------------------
-# KPI computation — section 3.2 of the KPI and Feasibility Definitions document
+# KPI computation - section 3.2 of the KPI and Feasibility Definitions document
 # ----------------------------------------------------------------------------
 
 def compute_kpis(plan_with_soc: pd.DataFrame, config: Config = DEFAULT_CONFIG,) -> dict:

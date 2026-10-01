@@ -112,7 +112,7 @@ with tab_overview:
             "across the 9 feasibility checks. See the Feasibility checks tab for details."
         )
     else:
-        st.success("All 9 feasibility checks pass — no violations found.")
+        st.success("All 9 feasibility checks pass - no violations found.")
 
 with tab_feasibility:
     st.subheader("Feasibility checks")
@@ -121,7 +121,7 @@ with tab_feasibility:
         "Each row shows which of the 9 checks was violated, on which bus, and why."
     )
     if not all_issues_result.issues:
-        st.success("No issues found — all feasibility checks pass.")
+        st.success("No issues found - all feasibility checks pass.")
     else:
         df_issues = all_issues_result.to_dataframe()
         check_filter = st.multiselect("Filter by feasibility check",
@@ -146,7 +146,7 @@ with tab_feasibility:
         st.dataframe(summary, use_container_width=True)
 
 with tab_gantt:
-    st.subheader("Bus plan — Gantt chart")
+    st.subheader("Bus plan - Gantt chart")
     buses_available = sorted(plan_soc["bus"].unique())
     selected_buses = st.multiselect("Filter buses (empty = show all)", buses_available)
     plot_data = plan_soc[plan_soc["bus"].isin(selected_buses)] if selected_buses else plan_soc
