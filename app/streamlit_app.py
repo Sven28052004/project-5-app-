@@ -164,44 +164,38 @@ with tab_soc:
 with tab_kpi:
     st.subheader("Key Performance Indicators (section 3.2)")
 
-    st.markdown("**Fleet size and trips**")
-    c1, c2, c3, c4 = st.columns(4)
+    st.markdown("**Importend KPI's**")
+    c1, c2, c3, c4, c5, c6 = st.columns(4)
     c1.metric("1. Number of buses used", kpis["n_buses"])
-    c2.metric("2. Number of service trips", kpis["n_service_trips"])
-    c3.metric("5. Number of material trips", kpis["n_material_trips"])
-    c4.metric("6. Number of charging sessions", kpis["n_charging_sessions"])
+    c2.metric("3. Deadhead ratio", f"{kpis['deadhead_ratio']:.2f}")
+    c3.metric("4. Productive time ratio", f"{kpis['productive_time_ratio']:.1%}")
+    c4.metric("7. Total service hours", f"{kpis['total_service_hours']:.1f} h")
+    c5.metric("10. Total idle hours", f"{kpis['total_idle_hours']:.1f} h")
+    c6.metric("12. Buses breaching safety margin", kpis["buses_below_margin"])
 
-    st.markdown("**Ratios**")
-    c5, c6 = st.columns(2)
-    c5.metric("3. Deadhead ratio", f"{kpis['deadhead_ratio']:.2f}")
-    c6.metric("4. Productive time ratio", f"{kpis['productive_time_ratio']:.1%}")
-
-    st.markdown("**Time totals**")
-    c7, c8, c9, c10 = st.columns(4)
-    c7.metric("7. Total service hours", f"{kpis['total_service_hours']:.1f} h")
-    c8.metric("8. Total material hours", f"{kpis['total_material_hours']:.1f} h")
-    c9.metric("9. Total charging hours", f"{kpis['total_charging_hours']:.1f} h")
-    c10.metric("10. Total idle hours", f"{kpis['total_idle_hours']:.1f} h")
-
-    st.markdown("**Battery safety**")
-    c11, c12 = st.columns(2)
-    c11.metric("11. Lowest SOC reached", f"{kpis['min_soc_kwh_overall']:.1f} kWh")
-    c12.metric("12. Buses breaching safety margin", kpis["buses_below_margin"])
-
+    st.markdown("**Less importend KPI's**")
+    c7, c8, c9, c10, c11, c12 = st.columns(4)
+    c7.metric("2. Number of service trips", kpis["n_service_trips"])
+    c8.metric("5. Number of material trips", kpis["n_material_trips"])
+    c9.metric("6. Number of charging sessions", kpis["n_charging_sessions"])
+    c10.metric("8. Total material hours", f"{kpis['total_material_hours']:.1f} h")
+    c11.metric("9. Total charging hours", f"{kpis['total_charging_hours']:.1f} h")
+    c12.metric("11. Lowest SOC reached", f"{kpis['min_soc_kwh_overall']:.1f} kWh")
+    
     st.markdown("**KPI definitions**")
     st.markdown(
-        "1. **Number of buses used** — min |B|\n"
-        "2. **Number of service trips** — max |S|\n"
-        "3. **Deadhead ratio** — material-trip hours ÷ service-trip hours (minimize)\n"
-        "4. **Productive time ratio** — service-trip hours ÷ total scheduled hours (maximize)\n"
-        "5. **Number of material trips** — min |M|\n"
-        "6. **Number of charging sessions** — min |C|\n"
-        "7. **Total service hours** — maximize\n"
-        "8. **Total material hours** — minimize\n"
-        "9. **Total charging hours** — minimize\n"
-        "10. **Total idle hours** — minimize\n"
-        "11. **Lowest SOC reached** — min SOC across all buses and routes\n"
-        "12. **Number of buses breaching the safety margin** — minimize (target: 0)"
+        "1. **Number of buses used** - minimize bussen used"
+        "2. **Number of service trips** - maximize amount of service trips"
+        "3. **Deadhead ratio** - material-trip hours ÷ service-trip hours (minimize)\n"
+        "4. **Productive time ratio** - service-trip hours ÷ total scheduled hours (maximize)\n"
+        "5. **Number of material trips** - minimize amount of material trips"
+        "6. **Number of charging sessions** - minimize amount of charging secions"
+        "7. **Total service hours** - maximize service hours"
+        "8. **Total material hours** - minimize material hours"
+        "9. **Total charging hours** - minimize charging hours"
+        "10. **Total idle hours** - minimize idle hours"
+        "11. **Lowest SOC reached** - minimize SOC across all buses and routes\n"
+        "12. **Number of buses breaching the safety margin** - minimize buses breached SOC safety margin (target: 0)"
     )
 
 st.divider()
