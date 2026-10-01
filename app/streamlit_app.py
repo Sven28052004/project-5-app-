@@ -167,35 +167,36 @@ with tab_kpi:
     st.markdown("**Importend KPI's**")
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric("1. Number of buses used", kpis["n_buses"])
-    c2.metric("3. Deadhead ratio", f"{kpis['deadhead_ratio']:.2f}")
-    c3.metric("4. Productive time ratio", f"{kpis['productive_time_ratio']:.1%}")
-    c4.metric("7. Total service hours", f"{kpis['total_service_hours']:.1f} h")
-    c5.metric("10. Total idle hours", f"{kpis['total_idle_hours']:.1f} h")
-    c6.metric("12. Buses breaching safety margin", kpis["buses_below_margin"])
+    c2.metric("2. Deadhead ratio", f"{kpis['deadhead_ratio']:.2f}")
+    c3.metric("3. Productive time ratio", f"{kpis['productive_time_ratio']:.1%}\n")
+    c4.metric("4. Total service hours", f"{kpis['total_service_hours']:.1f} h")
+    c5.metric("5. Total idle hours", f"{kpis['total_idle_hours']:.1f} h")
+    c6.metric("6. Buses breaching safety margin", kpis["buses_below_margin"])
 
     st.markdown("**Less importend KPI's**")
     c7, c8, c9, c10, c11, c12 = st.columns(6)
-    c7.metric("2. Number of service trips", kpis["n_service_trips"])
-    c8.metric("5. Number of material trips", kpis["n_material_trips"])
-    c9.metric("6. Number of charging sessions", kpis["n_charging_sessions"])
-    c10.metric("8. Total material hours", f"{kpis['total_material_hours']:.1f} h")
-    c11.metric("9. Total charging hours", f"{kpis['total_charging_hours']:.1f} h")
-    c12.metric("11. Lowest SOC reached", f"{kpis['min_soc_kwh_overall']:.1f} kWh")
+    c7.metric("7. Number of service trips", kpis["n_service_trips"])
+    c8.metric("8. Number of material trips", kpis["n_material_trips"])
+    c9.metric("9. Number of charging sessions", kpis["n_charging_sessions\n"])
+    c10.metric("10. Total material hours", f"{kpis['total_material_hours']:.1f} h")
+    c11.metric("11. Total charging hours", f"{kpis['total_charging_hours']:.1f} h")
+    c12.metric("12. Lowest SOC reached", f"{kpis['min_soc_kwh_overall']:.1f} kWh")
     
     st.markdown("**KPI definitions**")
     st.markdown(
-        "1. **Number of buses used** - minimize bussen used"
-        "2. **Number of service trips** - maximize amount of service trips"
-        "3. **Deadhead ratio** - material-trip hours ÷ service-trip hours (minimize)\n"
-        "4. **Productive time ratio** - service-trip hours ÷ total scheduled hours (maximize)\n"
-        "5. **Number of material trips** - minimize amount of material trips"
-        "6. **Number of charging sessions** - minimize amount of charging secions"
-        "7. **Total service hours** - maximize service hours"
-        "8. **Total material hours** - minimize material hours"
-        "9. **Total charging hours** - minimize charging hours"
-        "10. **Total idle hours** - minimize idle hours"
-        "11. **Lowest SOC reached** - minimize SOC across all buses and routes\n"
-        "12. **Number of buses breaching the safety margin** - minimize buses breached SOC safety margin (target: 0)"
+        "1. **Number of buses used** - minimize bussen used\n"
+        "2. **Deadhead ratio** - material-trip hours ÷ service-trip hours (minimize)\n"
+        "3. **Productive time ratio** - service-trip hours ÷ total scheduled hours (maximize)\n"
+        "4. **Total service hours** - maximize service hours\n"
+        "5. **Total idle hours** - minimize idle hours\n"
+        "6. **Number of buses breaching the safety margin** - minimize buses breached SOC safety margin (target: 0)\n"
+        "7. **Number of service trips** - maximize amount of service trips\n"
+        "8. **Number of material trips** - minimize amount of material trips\n"
+        "9. **Number of charging sessions** - minimize amount of charging secions\n"
+        "10. **Total material hours** - minimize material hours\n"
+        "11. **Total charging hours** - minimize charging hours\n"
+        "12. **Lowest SOC reached** - minimize SOC across all buses and routes\n"
+
     )
 
 st.divider()
