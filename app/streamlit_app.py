@@ -162,7 +162,7 @@ with tab_soc:
     st.plotly_chart(fig2, use_container_width=True)
 
 with tab_kpi:
-    st.subheader("Key Performance Indicators (section 3.2)")
+    st.subheader("Key Performance Indicators")
 
     st.markdown("**Importend KPI's**")
     c1, c2, c3 = st.columns(3)
