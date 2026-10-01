@@ -16,6 +16,10 @@ st.set_page_config(page_title="E-Bus Planning Checker", layout="wide")
 
 st.title("E-Bus Planning Checker")
 
+def kleine_kpi(col, label, waarde):
+    col.caption(label)
+    col.markdown(f"##### {waarde}")
+
 # ----------------------------------------------------------------------------
 # Sidebar: inputs and assumptions
 # ----------------------------------------------------------------------------
