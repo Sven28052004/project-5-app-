@@ -165,7 +165,7 @@ with tab_kpi:
     st.subheader("Key Performance Indicators (section 3.2)")
 
     st.markdown("**Importend KPI's**")
-    c1, c2, c3, c4, c5, c6 = st.columns(4)
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric("1. Number of buses used", kpis["n_buses"])
     c2.metric("3. Deadhead ratio", f"{kpis['deadhead_ratio']:.2f}")
     c3.metric("4. Productive time ratio", f"{kpis['productive_time_ratio']:.1%}")
@@ -174,7 +174,7 @@ with tab_kpi:
     c6.metric("12. Buses breaching safety margin", kpis["buses_below_margin"])
 
     st.markdown("**Less importend KPI's**")
-    c7, c8, c9, c10, c11, c12 = st.columns(4)
+    c7, c8, c9, c10, c11, c12 = st.columns(6)
     c7.metric("2. Number of service trips", kpis["n_service_trips"])
     c8.metric("5. Number of material trips", kpis["n_material_trips"])
     c9.metric("6. Number of charging sessions", kpis["n_charging_sessions"])
