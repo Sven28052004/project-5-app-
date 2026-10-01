@@ -101,10 +101,10 @@ with tab_overview:
     col3.metric("Warnings", n_warnings)
 
     st.markdown(
-        "This tool checks the uploaded bus plan against the **9 feasibility checks** "
-        "and reports the **12 KPIs** defined for this project. "
-        "See the *Feasibility checks* tab for the full list of violations, or the "
-        "*KPIs* tab for the performance summary."
+        "This tool checks the uploaded bus plan against the 9 feasibility checks "
+        "and reports the 12 KPIs defined for this project. "
+        "See the Feasibility checks tab for the full list of violations, or the "
+        "KPIs tab for the performance summary."
     )
 
     if n_errors > 0:
