@@ -16,10 +16,6 @@ def _minutes_to_label(m):
     mi = int(m % 60)
     return f"{h:02d}:{mi:02d}"
 
-def kleine_kpi(col, label, waarde):
-    col.caption(label)
-    col.markdown(f"##### {waarde}")
-
 def build_gantt(plan: pd.DataFrame, title: str = "Bus plan — Gantt chart") -> go.Figure:
     fig = go.Figure()
     buses = sorted(plan["bus"].unique())
