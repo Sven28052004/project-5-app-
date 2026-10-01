@@ -1,13 +1,3 @@
-"""
-E-Bus Planning Checker — prototype tool
-Interface language: English (per assignment requirement)
-
-Implements exactly the 12 KPIs (section 3.2) and 9 feasibility checks (section 3.3)
-from the KPI and Feasibility Definitions document.
-
-Run locally with: streamlit run app/streamlit_app.py
-"""
-
 import streamlit as st
 import pandas as pd
 import sys
@@ -112,7 +102,7 @@ with tab_overview:
 
     st.markdown(
         "This tool checks the uploaded bus plan against the **9 feasibility checks** "
-        "(section 3.3) and reports the **12 KPIs** (section 3.2) defined for this project. "
+        "and reports the **12 KPIs** defined for this project. "
         "See the *Feasibility checks* tab for the full list of violations, or the "
         "*KPIs* tab for the performance summary."
     )
@@ -126,7 +116,7 @@ with tab_overview:
         st.success("All 9 feasibility checks pass — no violations found.")
 
 with tab_feasibility:
-    st.subheader("Feasibility checks (section 3.3)")
+    st.subheader("Feasibility checks")
     st.markdown(
         "Every requirement below must be met for the plan to be feasible. "
         "Each row shows which of the 9 checks was violated, on which bus, and why."
@@ -216,4 +206,3 @@ with tab_kpi:
     )
 
 st.divider()
-st.caption("Prototype developed for Project 5 — not for operational use without further validation.")
